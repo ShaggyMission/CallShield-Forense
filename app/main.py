@@ -36,7 +36,8 @@ def verificar_estado():
         "motores_cargados": [
             "Motor 1 (Wav2Vec2-Bert-VoiceDetector)",
             "Motor 2 (Whisper-Tiny)",
-            "Motor 3 (BART-ZeroShot)"
+            "Motor 3 (mDeBERTa Ingeniería Social)",
+            "Motor 4 (Riesgo Consolidado)"
         ]
     }
 
@@ -86,14 +87,19 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
         # =====================================================
         # MOTOR 3 - Ingeniería Social
         # =====================================================
-        tacticas_detectadas = social_engine.analizar_texto(texto_transcrito)
+        analisis_social = social_engine.analizar_texto(
+            texto_transcrito
+        )
+
+
+        tacticas_detectadas = analisis_social["tacticas"]
 
         # =====================================================
         # MOTOR 4 - Riesgo Consolidado
         # =====================================================
         analisis_riesgo = calcular_riesgo_y_recomendaciones(
             score_voz_ia,
-            tacticas_detectadas
+            analisis_social
         )
 
         return {
@@ -104,12 +110,23 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
             "metricas": {
                 "motor1_voz_ia": score_voz_ia,
                 "nivel_confianza_voz": reporte_forense.nivel_confianza,
-                "motor3_ingenieria_social": max(tacticas_detectadas.values()) if tacticas_detectadas else 0,
+                "motor3_ingenieria_social": analisis_social["riesgo_social"],
                 "riesgo_global": analisis_riesgo["riesgo_global"],
                 "nivel": analisis_riesgo["nivel_evaluacion"]
             },
 
             "desglose_tacticas": tacticas_detectadas,
+            "analisis_social": {
+
+                 "fraude_detectado": analisis_social["fraude_detectado"],
+
+                 "confianza_fraude": analisis_social["confianza_fraude"],
+
+                 "riesgo_social": analisis_social["riesgo_social"],
+
+                 "nivel_riesgo": analisis_social["nivel_riesgo"]
+
+        },
 
             # Información adicional del análisis forense
             "analisis_forense": {
@@ -129,7 +146,8 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
 
                 "advertencia": reporte_forense.advertencia
             },
-
+            
+            "detalles_audio_whisper": whisper_engine.obtener_metricas_forenses(),
             "recomendaciones_seguridad": analisis_riesgo["recomendaciones"]
         }
 
