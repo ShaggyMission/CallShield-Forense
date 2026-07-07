@@ -182,12 +182,15 @@ class SocialEngine:
 
         return {
 
-
             "fraude_detectado": fraude,
 
-            "confianza_fraude": int(confianza * 100)
+             "confianza_fraude": (
+                int(confianza * 100)
+                if fraude
+                else 0
+    )
 
-        }
+}
 
 
 
@@ -550,16 +553,28 @@ class SocialEngine:
 
             return {
 
-
                 **primera_etapa,
 
-                "riesgo_social":
-                    primera_etapa["confianza_fraude"],
+                "riesgo_social": 0,
 
-                "tacticas":
-                    empty_result()
+                "nivel_riesgo": "BAJO",
 
-            }
+                "tacticas": empty_result()
+
+    }
+
+
+            return {
+
+        **primera_etapa,
+
+        "riesgo_social": riesgo,
+
+        "nivel_riesgo": nivel,
+
+        "tacticas": empty_result()
+
+    }
 
 
 
@@ -586,22 +601,25 @@ class SocialEngine:
         )
 
 
-        nivel = self.obtener_nivel_riesgo(
-        riesgo_social
+        nivel = (
+    "CRITICO" if riesgo_social >= 80 else
+    "ALTO" if riesgo_social >= 60 else
+    "MEDIO" if riesgo_social >= 30 else
+    "BAJO"
 )
 
 
         return {
 
-            "fraude_detectado": primera_etapa["fraude_detectado"],
+    "fraude_detectado": primera_etapa["fraude_detectado"],
 
-            "confianza_fraude": primera_etapa["confianza_fraude"],
+    "confianza_fraude": primera_etapa["confianza_fraude"],
 
-             "riesgo_social": riesgo_social,
+    "riesgo_social": riesgo_social,
 
-             "nivel_riesgo": nivel,
+    "nivel_riesgo": nivel,
 
-            "tacticas": tacticas
+    "tacticas": tacticas
 
 }
 
