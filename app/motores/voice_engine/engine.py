@@ -41,6 +41,10 @@ class ReporteForense:
     prob_real: float
     prob_fake: float
     prediccion: str
+    margen_decision: float
+    checkpoint: str
+    dispositivo: str
+    configuracion: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -262,6 +266,14 @@ class VoiceAIEngine:
             prob_real=round(prob_real, 6),
             prob_fake=round(prob_fake, 6),
             prediccion=prediccion,
+            margen_decision=round(prob_real - prob_fake, 6),
+            checkpoint=str(self.checkpoint_path),
+            dispositivo=str(self.device),
+            configuracion={
+                "sample_rate_entrada": self.sample_rate_entrada,
+                "max_len_muestras": self.max_len_muestras,
+                "umbral_decision": self.umbral_decision,
+            },
         )
 
     def analizar_clonacion(self, ruta_audio: str) -> ReporteForense:
@@ -281,6 +293,8 @@ class VoiceAIEngine:
                 "umbral_decision": self.umbral_decision,
                 "sample_rate_entrada": self.sample_rate_entrada,
                 "max_len_muestras": self.max_len_muestras,
+                "checkpoint": str(self.checkpoint_path),
+                "dispositivo": str(self.device),
             },
             "error_carga": self._load_error,
         }

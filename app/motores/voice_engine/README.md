@@ -8,7 +8,6 @@ Su funcion es recibir un archivo de audio, normalizarlo, cargar el modelo entren
 
 ```text
 app/motores/voice_engine/
-  api.py
   engine.py
   __init__.py
   config_produccion.json
@@ -27,13 +26,6 @@ Contiene la logica principal del motor:
 - prepara el audio
 - ejecuta inferencia
 - devuelve un reporte estructurado
-
-### `api.py`
-
-Expone el motor como API FastAPI:
-
-- `GET /api/v1/voice-engine/health`
-- `POST /api/v1/voice-engine/analizar`
 
 ### `config_produccion.json`
 
@@ -94,9 +86,18 @@ Ejemplo:
 - `sample_rate_entrada`: frecuencia de muestreo esperada.
 - `max_len_muestras`: longitud objetivo del audio procesado.
 
-## Respuesta del endpoint
+## Integracion con la API principal
 
-La API retorna un JSON con:
+Este modulo no expone una ruta publica de analisis separada.
+Su salida se consume desde:
+
+- `POST /api/v1/analisis/forense`
+
+Alli el motor de voz se ejecuta junto con Whisper y el analisis de ingenieria social.
+
+## Respuesta del motor de voz
+
+Cuando se invoca internamente, el motor retorna un JSON con:
 
 - `archivo`
 - `evidencia_neuronal`
@@ -107,12 +108,6 @@ La API retorna un JSON con:
 - `prob_real`
 - `prob_fake`
 - `prediccion`
-
-## Ejemplo de uso
-
-```powershell
-curl.exe -X POST "http://127.0.0.1:8000/api/v1/voice-engine/analizar" -F "file=@C:\ruta\audio.wav"
-```
 
 ## Endpoint de salud
 

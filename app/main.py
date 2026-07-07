@@ -1,8 +1,6 @@
 import os
 import sys
 import shutil
-import tempfile
-from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -52,37 +50,18 @@ def verificar_estado():
     }
 
 
-def _guardar_audio_temporal_voice_engine(file: UploadFile) -> str:
-    nombre_archivo = Path(file.filename or "audio").name
-    temp_dir = Path(tempfile.gettempdir()) / "callshield_voice_engine"
-    temp_dir.mkdir(parents=True, exist_ok=True)
-
-    ruta_guardado = temp_dir / f"voice_engine_{nombre_archivo}"
-
-    with ruta_guardado.open("wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    return str(ruta_guardado)
-
-
 @app.get("/api/v1/voice-engine/health")
 def health_voice_engine():
     return voice_ai_engine.estado()
 
 
-@app.post("/api/v1/voice-engine/analizar")
-async def analizar_audio_voice_engine(file: UploadFile = File(...)):
-    validar_archivo_audio(file)
-
-    ruta_guardada = _guardar_audio_temporal_voice_engine(file)
+def _analizar_voice_engine_desde_ruta(ruta_audio: str):
+    if not voice_ai_engine.listo and voice_ai_engine.error_carga:
+        raise HTTPException(status_code=503, detail=voice_ai_engine.error_carga)
 
     try:
-        if not voice_ai_engine.listo and voice_ai_engine.error_carga:
-            raise HTTPException(status_code=503, detail=voice_ai_engine.error_carga)
-
-        reporte = voice_ai_engine.analizar_clonacion(ruta_guardada)
-        return reporte.to_dict()
-
+        reporte = voice_ai_engine.analizar_clonacion(ruta_audio)
+        return reporte
     except HTTPException:
         raise
     except Exception as exc:
@@ -90,9 +69,6 @@ async def analizar_audio_voice_engine(file: UploadFile = File(...)):
             status_code=500,
             detail=f"Error en voice_engine: {str(exc)}"
         ) from exc
-    finally:
-        if os.path.exists(ruta_guardada):
-            os.remove(ruta_guardada)
 
 
 @app.post("/api/v1/analisis/forense")
@@ -121,7 +97,7 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
         # =====================================================
         # MOTOR 1 - Detección de voz sintética
         # =====================================================
-        reporte_forense = voice_ai_engine.analizar_clonacion(ruta_guardado)
+        reporte_forense = _analizar_voice_engine_desde_ruta(ruta_guardado)
 
         # Extraemos el score para mantener compatibilidad
         score_voz_ia = reporte_forense.score_riesgo
@@ -186,7 +162,14 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
                 "modelo": reporte_forense.evidencia_neuronal.nombre_modelo,
                 "modelo_disponible": reporte_forense.evidencia_neuronal.disponible,
                 "score_modelo": reporte_forense.evidencia_neuronal.score_fake_pct,
-
+                "prediccion": reporte_forense.prediccion,
+                "prob_real": reporte_forense.prob_real,
+                "prob_fake": reporte_forense.prob_fake,
+                "margen_decision": reporte_forense.margen_decision,
+                "umbral_decision": reporte_forense.umbral_decision,
+                "checkpoint": reporte_forense.checkpoint,
+                "dispositivo": reporte_forense.dispositivo,
+                "configuracion_modelo": reporte_forense.configuracion,
                 "advertencia": reporte_forense.advertencia
             },
             

@@ -32,7 +32,6 @@ app/
     whisper_engine.py
     social_engine.py
     voice_engine/
-      api.py
       engine.py
       config_produccion.json
       sls_best.pth
@@ -110,22 +109,6 @@ Salida:
 
 Devuelve el estado del modulo `voice_engine`, el checkpoint usado y la configuracion de produccion.
 
-### `POST /api/v1/voice-engine/analizar`
-
-Endpoint directo del motor de voz.
-
-Entrada:
-
-- archivo de audio en form-data con la clave `file`
-
-Salida:
-
-- `prediccion`
-- `prob_real`
-- `prob_fake`
-- `score_riesgo`
-- `umbral_decision`
-
 ## Ejemplo de respuesta general
 
 ```json
@@ -189,10 +172,10 @@ Contiene la version de produccion del modelo neuronal de voz, su checkpoint y su
 
 ## Probar rapidamente
 
-Puedes probar con `curl.exe`:
+El analisis completo se hace con:
 
 ```powershell
-curl.exe -X POST "http://127.0.0.1:8000/api/v1/voice-engine/analizar" -F "file=@C:\ruta\audio.wav"
+curl.exe -X POST "http://127.0.0.1:8000/api/v1/analisis/forense" -F "file=@C:\ruta\audio.wav"
 ```
 
 ## Notas de uso
