@@ -175,7 +175,7 @@ class SocialEngine:
 
             and
 
-            confianza >= 0.55
+            confianza >= 0.70
 
         )
 
@@ -354,8 +354,82 @@ class SocialEngine:
                 "información",
                 "informacion"
 
-            ]
+            ],
+            "amenaza": [
 
+                "si no",
+
+                "consecuencias",
+
+                "vas a pagar",
+
+                "te arrepentirás",
+
+                "última advertencia",
+
+                "último aviso",
+
+                "castigo",
+
+                "problemas legales"
+
+            ],
+            "culpa": [
+
+                "por tu culpa",
+
+                "es tu culpa",
+
+                "me abandonaste",
+
+                "siempre haces lo mismo",
+
+                "todo es culpa tuya"
+
+            ],
+            "chantaje_emocional":[
+
+                "si me quieres",
+
+                "si de verdad me amas",
+
+                "si no haces esto",
+
+                "solo tú puedes ayudarme",
+
+                "depende de ti"
+
+        ],
+        "manipulacion_emocional":[
+
+                "estoy desesperado",
+
+                "estoy llorando",
+
+                "me voy a morir",
+
+                "por favor ayúdame",
+
+                "no tengo a nadie",
+
+            "estoy muy mal"
+
+        ],
+        "urgencia":[
+
+            "urgente",
+
+            "ahora",
+
+            "ya",
+
+            "de inmediato",
+
+            "en este momento",
+
+            "rápido"
+
+        ],
         }
 
 
@@ -397,113 +471,138 @@ class SocialEngine:
 
 
         return resultado
-
-
-
     # =====================================================
     # FASE 3
     # CÁLCULO DE RIESGO SOCIAL
     # =====================================================
 
-    
-        # =====================================================
-    # CALCULO DE RIESGO SOCIAL
-    # =====================================================
-
     def calcular_riesgo_social(self, confianza_fraude, tacticas):
         """
-        Calcula riesgo final combinando:
-        - Confianza del detector inicial
-        - Severidad de técnicas de ingeniería social
+        Calcula el riesgo final combinando:
+        - Confianza del detector general.
+        - Severidad de las tácticas detectadas.
+        - Combinaciones típicas de ingeniería social.
         """
 
         if not tacticas:
             return confianza_fraude
 
+        # =====================================
+        # PESOS POR TÁCTICA
+        # =====================================
 
-        # Técnicas críticas
         pesos = {
 
             "solicitud_economica": 1.5,
             "suplantacion": 1.5,
             "falsa_emergencia": 1.4,
+            "info_confidencial": 1.4,
             "amenaza": 1.3,
             "aislamiento": 1.3,
-            "info_confidencial": 1.4,
 
+            "chantaje_emocional": 1.2,
             "urgencia": 1.1,
             "manipulacion_emocional": 1.1,
-            "chantaje_emocional": 1.2,
+
             "autoridad": 1.0,
             "culpa": 0.9
         }
 
-
-
         suma = 0
         peso_total = 0
-
 
         for tecnica, valor in tacticas.items():
 
             if valor <= 0:
                 continue
 
-
-            peso = pesos.get(tecnica,1)
-
+            peso = pesos.get(tecnica, 1)
 
             suma += valor * peso
-
             peso_total += peso
 
-
-
         if peso_total == 0:
-
             riesgo_tacticas = 0
-
         else:
-
             riesgo_tacticas = suma / peso_total
 
+        # =====================================
+        # FACTOR POR CANTIDAD DE TÁCTICAS
+        # =====================================
 
+        tecnicas_fuertes = sum(
 
-        # Combinación final
+            1
+
+            for valor in tacticas.values()
+
+            if valor >= 70
+
+        )
+
+        factor = max(0.70, min(tecnicas_fuertes / 5, 1))
+
+        riesgo_tacticas *= factor
+
+        # =====================================
+        # RIESGO BASE
+        # =====================================
+
         riesgo_final = (
 
-            confianza_fraude * 0.45
+            confianza_fraude * 0.35
 
             +
 
-            riesgo_tacticas * 0.55
+            riesgo_tacticas * 0.65
 
         )
 
+        # =====================================
+        # BONIFICACIONES
+        # =====================================
 
-        # Bonus por múltiples técnicas simultáneas
-        tecnicas_activas = sum(
-            1 for valor in tacticas.values()
-            if valor >= 50
-        )
-
-
-        if tecnicas_activas >= 5:
-
+        if (
+            tacticas["solicitud_economica"] >= 70 and
+            tacticas["urgencia"] >= 70
+        ):
             riesgo_final += 5
 
+        if (
+            tacticas["suplantacion"] >= 70 and
+            tacticas["solicitud_economica"] >= 70
+        ):
+            riesgo_final += 10
 
-        elif tecnicas_activas >= 3:
+        if (
+            tacticas["suplantacion"] >= 70 and
+            tacticas["falsa_emergencia"] >= 70
+        ):
+            riesgo_final += 8
 
-            riesgo_final += 3
+        if (
+            tacticas["autoridad"] >= 70 and
+            tacticas["info_confidencial"] >= 70
+        ):
+            riesgo_final += 10
 
+        if (
+            tacticas["aislamiento"] >= 70 and
+            tacticas["solicitud_economica"] >= 70
+        ):
+            riesgo_final += 8
 
+        if (
+            tacticas["amenaza"] >= 70 and
+            tacticas["solicitud_economica"] >= 70
+        ):
+            riesgo_final += 8
 
-        return int(
-            min(riesgo_final,100)
-        )
+        riesgo_final = max(0, min(riesgo_final, 100))
 
-        # =====================================================
+        return int(riesgo_final)
+
+    # =====================================================
     # NIVEL DE RIESGO
     # =====================================================
 
@@ -527,33 +626,13 @@ class SocialEngine:
 
     def analizar_texto(self, texto):
 
-
         if not texto or not texto.strip():
 
             return {
 
-                "fraude_detectado":False,
+                "fraude_detectado": False,
 
-                "confianza_fraude":0,
-
-                "riesgo_social":0,
-
-                "tacticas":empty_result()
-
-            }
-
-
-
-        primera_etapa = self.detectar_manipulacion(texto)
-
-
-
-        if not primera_etapa["fraude_detectado"]:
-
-
-            return {
-
-                **primera_etapa,
+                "confianza_fraude": 0,
 
                 "riesgo_social": 0,
 
@@ -561,11 +640,9 @@ class SocialEngine:
 
                 "tacticas": empty_result()
 
-    }
+            }
 
         tacticas_modelo = self.analizar_tacticas(texto)
-
-
 
         tacticas = self.filtrar_tacticas_contextuales(
 
@@ -575,7 +652,9 @@ class SocialEngine:
 
         )
 
-
+        # ===============================
+        # ETAPA 3
+        # ===============================
 
         riesgo_social = self.calcular_riesgo_social(
 
@@ -585,33 +664,28 @@ class SocialEngine:
 
         )
 
+        nivel = self.obtener_nivel_riesgo(
 
-        nivel = (
-    "CRITICO" if riesgo_social >= 80 else
-    "ALTO" if riesgo_social >= 60 else
-    "MEDIO" if riesgo_social >= 30 else
-    "BAJO"
-)
+            riesgo_social
 
+        )
+
+        # ===============================
+        # RESULTADO
+        # ===============================
 
         return {
 
-    "fraude_detectado": primera_etapa["fraude_detectado"],
+            "fraude_detectado": primera_etapa["fraude_detectado"],
 
-    "confianza_fraude": primera_etapa["confianza_fraude"],
+            "confianza_fraude": primera_etapa["confianza_fraude"],
 
-    "riesgo_social": riesgo_social,
+            "riesgo_social": riesgo_social,
 
-    "nivel_riesgo": nivel,
+            "nivel_riesgo": nivel,
 
-    "tacticas": tacticas
+            "tacticas": tacticas
 
-}
-
-
-
-# =========================
-# INSTANCIA GLOBAL
-# =========================
-
+        }
+    
 social_engine = SocialEngine()

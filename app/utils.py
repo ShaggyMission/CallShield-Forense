@@ -23,37 +23,37 @@ def calcular_riesgo_y_recomendaciones(
     )
 
 
-    if riesgo_global >= settings.UMBRAL_RIESGO_CRITICO:
-
+    if riesgo_global >= 80:
         nivel = "CRÍTICO / ALTO RIESGO"
-
         recomendaciones = [
             "No continúe la conversación bajo ningún concepto.",
             "No entregue contraseñas, códigos de verificación SMS ni pines bancarios.",
             "Cuelgue de inmediato y contacte a su entidad financiera mediante canales oficiales.",
             "Reporte este número telefónico a las autoridades competentes."
-        ]
+    ]
 
+    elif riesgo_global >= 60:
+        nivel = "ALTO / MUY SOSPECHOSO"
+        recomendaciones = [
+            "Existe una alta probabilidad de intento de fraude.",
+            "No realice transferencias ni envíe dinero sin verificar la identidad por otro medio.",
+            "Confirme la información llamando directamente a la persona o institución."
+    ]
 
-    elif riesgo_global >= 45:
-
+    elif riesgo_global >= 35:
         nivel = "MEDIO / SOSPECHOSO"
-
         recomendaciones = [
             "Proceda con extrema precaución.",
             "No realice transferencias ni depósitos sin verificar la identidad.",
             "Verifique la información mediante otro canal."
-        ]
-
+    ]
 
     else:
-
         nivel = "BAJO / RECONOCIMIENTO NORMAL"
-
         recomendaciones = [
             "No se detectaron anomalías severas de ingeniería social o clonación.",
             "Manténgase atento ante solicitudes inusuales."
-        ]
+    ]
 
 
     return {
