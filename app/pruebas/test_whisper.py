@@ -14,7 +14,7 @@ if RAIZ_PROYECTO not in sys.path:
 from app.motores.whisper_engine import whisper_engine
 
 # 📂 RUTA EXTERNA ABSOLUTA TOTALMENTE INDEPENDIENTE DE GIT
-RUTA_AUDIOS_EXTERNA = r"C:\Users\andrea.guaquipana\Documents\Pasantes\Repos\Audios tests"
+RUTA_AUDIOS_EXTERNA = r"C:\Users\andyj\Desktop\Proyectos moviles\Audios"
 FORMATOS_SOPORTADOS = (".wav", ".mp3", ".m4a", ".caf", ".mp4")
 
 def desplegar_menu_interactivo() -> str:
