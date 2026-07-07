@@ -1,16 +1,26 @@
 import os
 import shutil
-from fastapi import FastAPI, UploadFile, File, HTTPException
+import json
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.security import validar_archivo_audio
 from app.utils import calcular_riesgo_y_recomendaciones
 
+# Importaciones de la capa de persistencia forense
+from app.database import engine, Base, get_db
+from app.models import Evidencia 
+
 # Importación de las instancias reales de los motores de IA
 from app.motores.whisper_engine import whisper_engine
 from app.motores.social_engine import social_engine
 from app.motores.voice_ai_engine import voice_ai_engine
+
+# ⚙️ Inicialización Automática de Infraestructura Local
+# Al arrancar la app, verifica si existe callshield.db; si no, crea el archivo y las tablas.
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -42,7 +52,11 @@ def verificar_estado():
 
 
 @app.post("/api/v1/analisis/forense")
-async def analizar_audio_forense(file: UploadFile = File(...)):
+async def analizar_audio_forense(
+    file: UploadFile = File(...),
+    uuid_dispositivo: str = Form(...), 
+    db: Session = Depends(get_db)   
+):
     # 🛡️ Validar extensión y tipo de archivo
     validar_archivo_audio(file)
 
@@ -90,7 +104,6 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
             texto_transcrito
         )
 
-
         tacticas_detectadas = analisis_social["tacticas"]
 
         # =====================================================
@@ -101,11 +114,10 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
             analisis_social
         )
 
-        return {
+        # Estructura del payload consolidado de respuesta
+        response_data = {
             "archivo_procesado": file.filename,
-
             "transcripcion_whisper": texto_transcrito,
-
             "metricas": {
                 "motor1_voz_ia": score_voz_ia,
                 "nivel_confianza_voz": reporte_forense.nivel_confianza,
@@ -113,42 +125,50 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
                 "riesgo_global": analisis_riesgo["riesgo_global"],
                 "nivel": analisis_riesgo["nivel_evaluacion"]
             },
-
             "desglose_tacticas": tacticas_detectadas,
             "analisis_social": {
-
                  "fraude_detectado": analisis_social["fraude_detectado"],
-
                  "confianza_fraude": analisis_social["confianza_fraude"],
-
                  "riesgo_social": analisis_social["riesgo_social"],
-
                  "nivel_riesgo": analisis_social["nivel_riesgo"]
-
-        },
-
-            # Información adicional del análisis forense
+            },
             "analisis_forense": {
                 "modelo": reporte_forense.evidencia_neuronal.nombre_modelo,
                 "modelo_disponible": reporte_forense.evidencia_neuronal.disponible,
                 "score_modelo": reporte_forense.evidencia_neuronal.score_fake_pct,
-
                 "benford": {
                     "mad": reporte_forense.evidencia_benford.mad,
                     "p_value": reporte_forense.evidencia_benford.p_value,
                     "categoria": reporte_forense.evidencia_benford.categoria_conformidad
                 },
-
                 "entropia": {
                     "valor_bits": reporte_forense.evidencia_entropia.valor_bits
                 },
-
                 "advertencia": reporte_forense.advertencia
             },
-            
             "detalles_audio_whisper": whisper_engine.obtener_metricas_forenses(),
             "recomendaciones_seguridad": analisis_riesgo["recomendaciones"]
         }
+
+        # =====================================================
+        # 🛡️ PERSISTENCIA FORENSE EN CALIENTE (Estrategia No Invasiva)
+        # =====================================================
+        try:
+            nueva_evidencia = Evidencia(
+                uuid_dispositivo=uuid_dispositivo,
+                nombre_archivo=file.filename,
+                # Serializamos el diccionario completo de respuesta directamente a texto
+                resultado_json=json.dumps(response_data, ensure_ascii=False)
+            )
+            db.add(nueva_evidencia)
+            db.commit()
+            db.refresh(nueva_evidencia)
+        except Exception as db_err:
+            # Tolerancia a fallos: Si la base de datos local falla por espacio, bloqueos o IO,
+            # imprimimos la alerta pero permitimos que el endpoint responda con éxito al usuario móvil.
+            print(f"⚠️ [Advertencia de Resguardo Forense] Falló el guardado local: {str(db_err)}")
+
+        return response_data
 
     except Exception as e:
         print(f"❌ [Fallo General Backend] Error en la tubería forense: {str(e)}")
@@ -161,3 +181,54 @@ async def analizar_audio_forense(file: UploadFile = File(...)):
         # Limpieza preventiva
         if os.path.exists(ruta_guardado):
             os.remove(ruta_guardado)
+
+
+# =====================================================
+# 📱 ENDPOINT: HISTORIAL LOCAL POR DISPOSITIVO
+# =====================================================
+@app.get("/api/v1/analisis/historial/{uuid_dispositivo}")
+def obtener_historial_dispositivo(uuid_dispositivo: str, db: Session = Depends(get_db)):
+    """
+    Recupera y reconstruye cronológicamente todas las evidencias resguardadas
+    pertenecientes al hardware del dispositivo móvil consultante.
+    """
+    registros = (
+        db.query(Evidencia)
+        .filter(Evidencia.uuid_dispositivo == uuid_dispositivo)
+        .order_by(Evidencia.fecha_registro.desc())
+        .all()
+    )
+    
+    historial = []
+    for reg in registros:
+        historial.append({
+            "id": reg.id,
+            "uuid_dispositivo": reg.uuid_dispositivo,
+            "nombre_archivo": reg.nombre_archivo,
+            "fecha_registro": reg.fecha_registro,
+            "resultado": json.loads(reg.resultado_json)  # Deserialización nativa inversa
+        })
+    return historial
+
+
+# =====================================================
+# 🔍 ENDPOINT: PISTA DE AUDITORÍA FORENSE GLOBAL
+# =====================================================
+@app.get("/api/v1/analisis/auditoria")
+def obtener_auditoria_global(db: Session = Depends(get_db)):
+    """
+    Endpoint maestro sin filtros de procedencia. Permite a los peritos del sistema
+    auditar, extraer y reconstruir la cadena de custodia completa del backend.
+    """
+    registros = db.query(Evidencia).order_by(Evidencia.fecha_registro.desc()).all()
+    
+    auditoria = []
+    for reg in registros:
+        auditoria.append({
+            "id": reg.id,
+            "uuid_dispositivo": reg.uuid_dispositivo,
+            "nombre_archivo": reg.nombre_archivo,
+            "fecha_registro": reg.fecha_registro,
+            "resultado": json.loads(reg.resultado_json)
+        })
+    return auditoria
