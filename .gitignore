@@ -1,4 +1,3 @@
-
 __pycache__/
 *.py[cod]
 *$py.class
@@ -35,5 +34,9 @@ models/
 .cache/
 huggingface/
 
-# Base de datos local de CallShield
+# Cambios de la rama main principal
+contexto_guardian_ai_v2.md
+Audios Whatsapp
+
+# 💾 Capa de Persistencia Forense (Tu apartado)
 callshield.db
