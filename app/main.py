@@ -1,17 +1,17 @@
 import os
 import sys
 import shutil
-import json  # <- Agregado para serializar la base de datos
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends  # <- Agregados Form y Depends
+import json
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends  
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session  # <- Agregado para la sesión DB
+from sqlalchemy.orm import Session 
 
 from app.config import settings
 from app.security import validar_archivo_audio
 from app.utils import calcular_riesgo_y_recomendaciones
 
 # =====================================================
-# 💾 Importaciones de tu Capa de Persistencia Forense
+# Importaciones de tu Capa de Persistencia Forense
 # =====================================================
 from app.database import engine, Base, get_db
 from app.models import Evidencia
@@ -25,7 +25,7 @@ from app.motores.social_engine import social_engine
 from app.motores.voice_engine import voice_ai_engine
 
 # =====================================================
-# ⚙️ Inicialización Automática de Infraestructura Local
+# Inicialización Automática de Infraestructura Local
 # =====================================================
 # Al encender el servidor, verifica o crea de forma transparente el archivo callshield.db
 Base.metadata.create_all(bind=engine)
@@ -138,7 +138,7 @@ async def analizar_audio_forense(
             analisis_social
         )
 
-        # 🌟 Estructura Consolidada Optimizada (Respetando el código oficial)
+        # Estructura Consolidada Optimizada (Respetando el código oficial)
         response_data = {
             "archivo_procesado": file.filename,
 
@@ -181,7 +181,7 @@ async def analizar_audio_forense(
         }
 
         # =====================================================
-        # 🛡️ PERSISTENCIA FORENSE EN CALIENTE (Estrategia No Invasiva)
+        # PERSISTENCIA FORENSE EN CALIENTE (Estrategia No Invasiva)
         # =====================================================
         try:
             nueva_evidencia = Evidencia(
@@ -211,7 +211,7 @@ async def analizar_audio_forense(
 
 
 # =====================================================
-# 📱 ENDPOINT: HISTORIAL LOCAL POR DISPOSITIVO
+# ENDPOINT: HISTORIAL LOCAL POR DISPOSITIVO
 # =====================================================
 @app.get("/api/v1/analisis/historial/{uuid_dispositivo}")
 def obtener_historial_dispositivo(uuid_dispositivo: str, db: Session = Depends(get_db)):
@@ -239,7 +239,7 @@ def obtener_historial_dispositivo(uuid_dispositivo: str, db: Session = Depends(g
 
 
 # =====================================================
-# 🔍 ENDPOINT: PISTA DE AUDITORÍA FORENSE GLOBAL
+# ENDPOINT: PISTA DE AUDITORÍA FORENSE GLOBAL
 # =====================================================
 @app.get("/api/v1/analisis/auditoria")
 def obtener_auditoria_global(db: Session = Depends(get_db)):
