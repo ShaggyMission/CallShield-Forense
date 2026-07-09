@@ -1,33 +1,26 @@
 import os
 import sys
 import shutil
-import json  
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends  
+import json
+import requests
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session  
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.security import validar_archivo_audio
 from app.utils import calcular_riesgo_y_recomendaciones
-
-# 💾 Importaciones de tu Capa de Persistencia Forense
 from app.database import engine, Base, get_db
 from app.models import Evidencia
 
-# El motor nuevo vive en app/motores/voice_engine/ y usa imports internos planos.
 VOICE_ENGINE_DIR = os.path.join(os.path.dirname(__file__), "motores", "voice_engine")
 if VOICE_ENGINE_DIR not in sys.path:
     sys.path.insert(0, VOICE_ENGINE_DIR)
 
-# Importación de las instancias reales de los motores de IA
 from app.motores.whisper_engine import whisper_engine
 from app.motores.social_engine import social_engine
-
-# Motor 1 centralizado en el paquete nuevo app/motores/voice_engine/
 from app.motores.voice_engine import voice_ai_engine
 
-# ⚙️ Inicialización Automática de Infraestructura Local
-# Al encender el servidor, verifica o crea de forma transparente el archivo callshield.db
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -35,7 +28,6 @@ app = FastAPI(
     description="Analizador Forense de Audios contra la Extorsión y el Fraude"
 )
 
-# Configuración de CORS para permitir conexiones desde la app móvil (Expo)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -43,6 +35,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _enviar_alerta_telegram(archivo: str, riesgo: str):
+    try:
+        token = "TU_TELEGRAM_TOKEN_AQUI"
+        chat_id = "TU_CHAT_ID_AQUI"
+        if token != "TU_TELEGRAM_TOKEN_AQUI":
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            mensaje = f"🚨 ALERTA CALLSHIELD: Se ha detectado un riesgo {riesgo} en el archivo analizado: {archivo}"
+            requests.post(url, json={"chat_id": chat_id, "text": mensaje}, timeout=3)
+    except Exception as e:
+        print(f"⚠️ Error al enviar notificación de Telegram: {str(e)}")
 
 
 @app.get("/")
@@ -83,20 +87,16 @@ def _analizar_voice_engine_desde_ruta(ruta_audio: str):
 @app.post("/api/v1/analisis/forense")
 async def analizar_audio_forense(
     file: UploadFile = File(...),
-    uuid_dispositivo: str = Form(...),  
-    db: Session = Depends(get_db)       
+    uuid_dispositivo: str = Form(...),
+    db: Session = Depends(get_db)
 ):
-    # 🛡️ Validar extensión y tipo de archivo
     validar_archivo_audio(file)
 
-    # Definir rutas para el procesamiento seguro del archivo
     nombre_archivo = f"evidencia_{file.filename}"
     ruta_guardado = os.path.join(settings.UPLOAD_DIR, nombre_archivo)
 
-    # Asegurar que el directorio de cargas exista
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
-    # Guardar el archivo
     try:
         with open(ruta_guardado, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -112,7 +112,6 @@ async def analizar_audio_forense(
         # =====================================================
         reporte_forense = _analizar_voice_engine_desde_ruta(ruta_guardado)
 
-        # Extraemos el score para mantener compatibilidad
         score_voz_ia = reporte_forense.score_riesgo
 
         # =====================================================
@@ -130,6 +129,7 @@ async def analizar_audio_forense(
         # MOTOR 3 - Ingeniería Social
         # =====================================================
         analisis_social = social_engine.analizar_texto(texto_transcrito)
+
         tacticas_detectadas = analisis_social["tacticas"]
 
         # =====================================================
@@ -137,7 +137,6 @@ async def analizar_audio_forense(
         # =====================================================
         analisis_riesgo = calcular_riesgo_y_recomendaciones(score_voz_ia, analisis_social)
 
-        # 🌟 Estructura Consolidada Optimizada (Mantiene al 100% las métricas de tus compañeros)
         response_data = {
             "archivo_procesado": file.filename,
             "transcripcion_whisper": texto_transcrito,
@@ -155,7 +154,6 @@ async def analizar_audio_forense(
                  "riesgo_social": analisis_social["riesgo_social"],
                  "nivel_riesgo": analisis_social["nivel_riesgo"]
             },
-            # Se respetan todas las variables añadidas por tu equipo para la defensa
             "analisis_forense": {
                 "modelo": reporte_forense.evidencia_neuronal.nombre_modelo,
                 "modelo_disponible": reporte_forense.evidencia_neuronal.disponible,
@@ -174,9 +172,6 @@ async def analizar_audio_forense(
             "recomendaciones_seguridad": analisis_riesgo["recomendaciones"]
         }
 
-        # =====================================================
-        # 🛡️ PERSISTENCIA FORENSE EN CALIENTE (Estrategia No Invasiva)
-        # =====================================================
         try:
             nueva_evidencia = Evidencia(
                 uuid_dispositivo=uuid_dispositivo,
@@ -187,7 +182,11 @@ async def analizar_audio_forense(
             db.commit()
             db.refresh(nueva_evidencia)
         except Exception as db_err:
-            print(f"⚠️ [Advertencia de Resguardo Forense] Falló el guardado local: {str(db_err)}")
+            print(f"⚠️ Falló el guardado local: {str(db_err)}")
+
+        riesgo_str = str(analisis_riesgo.get("riesgo_global", "")).upper()
+        if "CRÍTICO" in riesgo_str or "ALTO" in riesgo_str or "CRITICO" in riesgo_str:
+            _enviar_alerta_telegram(file.filename, analisis_riesgo["riesgo_global"])
 
         return response_data
 
@@ -199,27 +198,18 @@ async def analizar_audio_forense(
         )
 
     finally:
-        # Limpieza preventiva del archivo
         if os.path.exists(ruta_guardado):
             os.remove(ruta_guardado)
 
 
-# =====================================================
-# 📱 ENDPOINT: HISTORIAL LOCAL POR DISPOSITIVO
-# =====================================================
 @app.get("/api/v1/analisis/historial/{uuid_dispositivo}")
 def obtener_historial_dispositivo(uuid_dispositivo: str, db: Session = Depends(get_db)):
-    """
-    Recupera y reconstruye cronológicamente todas las evidencias resguardadas
-    pertenecientes al hardware del dispositivo móvil consultante.
-    """
     registros = (
         db.query(Evidencia)
         .filter(Evidencia.uuid_dispositivo == uuid_dispositivo)
         .order_by(Evidencia.fecha_registro.desc())
         .all()
     )
-    
     historial = []
     for reg in registros:
         historial.append({
@@ -232,17 +222,9 @@ def obtener_historial_dispositivo(uuid_dispositivo: str, db: Session = Depends(g
     return historial
 
 
-# =====================================================
-# 🔍 ENDPOINT: PISTA DE AUDITORÍA FORENSE GLOBAL
-# =====================================================
 @app.get("/api/v1/analisis/auditoria")
 def obtener_auditoria_global(db: Session = Depends(get_db)):
-    """
-    Endpoint maestro sin filtros de procedencia. Permite a los peritos del sistema
-    auditar, extraer y reconstruir la cadena de custodia completa del backend.
-    """
     registros = db.query(Evidencia).order_by(Evidencia.fecha_registro.desc()).all()
-    
     auditoria = []
     for reg in registros:
         auditoria.append({
